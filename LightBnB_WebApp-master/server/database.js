@@ -1,3 +1,4 @@
+const { response } = require('express');
 const { Pool } = require('pg');
 
 const pool = new Pool ({
@@ -18,18 +19,33 @@ const users = require('./json/users.json');
  * @param {String} email The email of the user.
  * @return {Promise<{}>} A promise to the user.
  */
+
+// SQL IMPLEMENTATION
 const getUserWithEmail = function(email) {
-  let user;
-  for (const userId in users) {
-    user = users[userId];
-    if (user.email.toLowerCase() === email.toLowerCase()) {
-      break;
-    } else {
-      user = null;
-    }
-  }
-  return Promise.resolve(user);
+  return pool.query('SELECT * FROM users WHERE email = $1;', [email])
+    .then((response) => {
+      if (response.rows.length === 0) {
+        console.log(response)
+        console.log(response.rows.length)
+        return null;
+      }
+      console.log(response.rows[0])
+      return response.rows[0];
+    })
 }
+
+// const getUserWithEmail = function(email) {
+//   let user;
+//   for (const userId in users) {
+//     user = users[userId];
+//     if (user.email.toLowerCase() === email.toLowerCase()) {
+//       break;
+//     } else {
+//       user = null;
+//     }
+//   }
+//   return Promise.resolve(user);
+// }
 exports.getUserWithEmail = getUserWithEmail;
 
 /**
@@ -37,9 +53,18 @@ exports.getUserWithEmail = getUserWithEmail;
  * @param {string} id The id of the user.
  * @return {Promise<{}>} A promise to the user.
  */
+
+// SQL Implementation
 const getUserWithId = function(id) {
-  return Promise.resolve(users[id]);
+  return pool.query('SELECT * FROM users WHERE id = $1;', [id])
+    .then((response) => {
+      return response.rows[0];
+    })
 }
+ 
+// const getUserWithId = function(id) {
+//   return Promise.resolve(users[id]);
+// }
 exports.getUserWithId = getUserWithId;
 
 
@@ -63,6 +88,7 @@ exports.addUser = addUser;
  * @param {string} guest_id The id of the user.
  * @return {Promise<[{}]>} A promise to the reservations.
  */
+
 const getAllReservations = function(guest_id, limit = 10) {
   return getAllProperties(null, 2);
 }
