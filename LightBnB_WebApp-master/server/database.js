@@ -25,11 +25,11 @@ const getUserWithEmail = function(email) {
   return pool.query('SELECT * FROM users WHERE email = $1;', [email])
     .then((response) => {
       if (response.rows.length === 0) {
-        console.log(response)
-        console.log(response.rows.length)
+        // console.log(response)
+        // console.log(response.rows.length)
         return null;
       }
-      console.log(response.rows[0])
+      // console.log(response.rows[0])
       return response.rows[0];
     })
 }
@@ -138,7 +138,7 @@ exports.getAllReservations = getAllReservations;
   let queryString = `
   SELECT properties.*, avg(property_reviews.rating) as average_rating
   FROM properties
-  JOIN property_reviews ON properties.id = property_id
+  LEFT JOIN property_reviews ON properties.id = property_id
   `;
 
   // 3
@@ -153,22 +153,22 @@ exports.getAllReservations = getAllReservations;
 
   if (options.owner_id) {
     queryParams.push(`%${options.owner_id}%`);
-    queryString += `AND properties.owner_id LIKE $${queryParams.length}`;
+    queryString += `WHERE properties.owner_id = $${queryParams.length}`;
   }
 
   if (options.minimum_price_per_night) {
     queryParams.push(options.minimum_price_per_night * 100);
-    queryString += `AND cost_per_night >= $${queryParams.length}`;
+    queryString += `AND properties.cost_per_night >= $${queryParams.length}`;
   }
 
   if (options.maximum_price_per_night) {
     queryParams.push(options.maximum_price_per_night * 100);
-    queryString += `AND cost_per_night <= $${queryParams.length}`;
+    queryString += `AND properties.cost_per_night <= $${queryParams.length}`;
   } 
 
   if (options.minimum_rating) {
     queryParams.push(options.minimum_rating);
-    queryString += `AND rating >= $${queryParams.length}`;
+    queryString += `HAVING AVG(property_reviews.rating) >= $${queryParams.length}`;
   }
 
   // 4
@@ -205,10 +205,40 @@ exports.getAllProperties = getAllProperties;
  * @param {{}} property An object containing all of the property details.
  * @return {Promise<{}>} A promise to the property.
  */
+
+// SQL IMPLEMENTATION
 const addProperty = function(property) {
-  const propertyId = Object.keys(properties).length + 1;
-  property.id = propertyId;
-  properties[propertyId] = property;
-  return Promise.resolve(property);
-}
+  const values = [property.owner_id,
+                  property.title,
+                  property.description,
+                  property.thumbnail_photo_url,
+                  property.cover_photo_url,
+                  property.cost_per_night,
+                  property.street,
+                  property.city,
+                  property.province,
+                  property.post_code,
+                  property.country,
+                  property.parking_spaces,
+                  property.number_of_bathrooms,
+                  property.number_of_bedrooms];
+  return pool.query(`INSERT INTO properties (owner_id, title,
+    description, thumbnail_photo_url, cover_photo_url, cost_per_night,
+    street, city, province, post_code, country, parking_spaces,
+    number_of_bathrooms, number_of_bedrooms) 
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    RETURNING *;
+    `, values)
+      .then((response) => {
+        return response.rows[0];
+      });
+};
+
+// const addProperty = function(property) {
+//   console.log("HELLO WORLD", property)
+//   const propertyId = Object.keys(properties).length + 1;
+//   property.id = propertyId;
+//   properties[propertyId] = property;
+//   return Promise.resolve(property);
+// }
 exports.addProperty = addProperty;
