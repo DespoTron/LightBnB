@@ -1,4 +1,4 @@
-const { response } = require('express');
+const { response, query } = require('express');
 const { Pool } = require('pg');
 
 const pool = new Pool ({
@@ -10,6 +10,8 @@ const pool = new Pool ({
 
 const properties = require('./json/properties.json');
 const users = require('./json/users.json');
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /**
  * Get a single user from the database given their email.
@@ -33,6 +35,8 @@ const getUserWithEmail = function(email) {
 
 exports.getUserWithEmail = getUserWithEmail;
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 /**
  * Get a single user from the database given their id.
  * @param {string} id The id of the user.
@@ -47,11 +51,9 @@ const getUserWithId = function(id) {
     })
 }
  
-// const getUserWithId = function(id) {
-//   return Promise.resolve(users[id]);
-// }
 exports.getUserWithId = getUserWithId;
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /**
  * Add a new user to the database.
@@ -70,6 +72,7 @@ const addUser = function(user) {
 exports.addUser = addUser;
 
 /// Reservations
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /**
  * Get all reservations for a single user.
@@ -96,6 +99,7 @@ const getAllReservations = function(guest_id, limit = 10) {
 exports.getAllReservations = getAllReservations;
 
 /// Properties
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /**
  * Get all properties.
@@ -104,13 +108,14 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 
- // SQL implementation
- const getAllProperties = function(options, limit = 10) {
+// SQL implementation
+const getAllProperties = function(options, limit = 10) {
   // 1 
   // Setup an array to hold params that may be available for query
   const queryParams = [];
   // 2
   // Start the query with all info that comes before the WHERE clause
+  // default sql query
   let queryString = `
   SELECT properties.*, avg(property_reviews.rating) as average_rating
   FROM properties
@@ -122,52 +127,68 @@ exports.getAllReservations = getAllReservations;
   // Add the city to the params array and create a WHERE clause for the city
   //    we can use length of the array to dynamically get the $n(same as $1) placeholder number
   //    the % syntax for the LIKE clase must be part ofthe params not the query
+  // adds city to query
   if (options.city) {
     queryParams.push(`%${options.city}%`);
     queryString += `WHERE city LIKE $${queryParams.length}`;
   }
 
-  if (options.owner_id) {
-    queryParams.push(`%${options.owner_id}%`);
-    queryString += `WHERE properties.owner_id = $${queryParams.length}`;
-  }
-
+  // adds minimum price per night to query
   if (options.minimum_price_per_night) {
-    queryParams.push(options.minimum_price_per_night * 100);
-    queryString += `AND properties.cost_per_night >= $${queryParams.length}`;
+    queryParams.push(`${options.minimum_price_per_night * 100}`);
+    if (options.city) {
+      queryString += `AND cost_per_night >= $${queryParams.length} `;
+    } else {
+      queryString += `WHERE cost_per_night >= $${queryParams.length} `;
+    }
   }
 
+  // adds maximum price per night to query
   if (options.maximum_price_per_night) {
-    queryParams.push(options.maximum_price_per_night * 100);
-    queryString += `AND properties.cost_per_night <= $${queryParams.length}`;
-  } 
-
-  if (options.minimum_rating) {
-    queryParams.push(options.minimum_rating);
-    queryString += `HAVING AVG(property_reviews.rating) >= $${queryParams.length}`;
+    queryParams.push(`${options.maximum_price_per_night*100}`);
+    if (options.city || options.minimum_price_per_night) {
+      queryString += `AND cost_per_night <= $${queryParams.length} `;
+    } else {
+      queryString += `WHERE cost_per_night <= $${queryParams.length} `;
+    }
   }
 
-  // 4
-  // Add any query that comes after the WHERE clause
+  // adds owner_id to query -> used in my listing
+  if(options.owner_id) {
+    queryParams.push(`${options.owner_id}`);
+    if (options.city || options.minimum_price_per_night || options.maximum_price_per_night) {
+      queryString += `AND owner_id = $${queryParams.length} `;
+    } else {
+      queryString += `WHERE owner_id = $${queryParams.length} `;
+    }
+  }
+
+  queryString +=`
+  GROUP BY properties.id
+  `
+  // adds minimum rating to query
+  if(options.minimum_rating) {
+    queryParams.push(`${options.minimum_rating}`);
+    queryString += `HAVING avg(property_reviews.rating) >= $${queryParams.length} `;
+  }
+
+  queryString +=`
+  ORDER BY cost_per_night
+  `
+  
+  // adds limit to query
   queryParams.push(limit);
   queryString += `
-  GROUP BY properties.id
-  ORDER BY cost_per_night
   LIMIT $${queryParams.length};
   `;
 
-  // 5
-  // console log everything to make sure we've done it right
-  console.log(queryString, queryParams);
-
-  // 6
-  // Run the query
   return pool.query(queryString, queryParams)
   .then(res => res.rows);
 }
 
 exports.getAllProperties = getAllProperties;
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /**
  * Add a property to the database
@@ -177,30 +198,26 @@ exports.getAllProperties = getAllProperties;
 
 // SQL IMPLEMENTATION
 const addProperty = function(property) {
-  const values = [property.owner_id,
-                  property.title,
-                  property.description,
-                  property.thumbnail_photo_url,
-                  property.cover_photo_url,
-                  property.cost_per_night,
-                  property.street,
-                  property.city,
-                  property.province,
-                  property.post_code,
-                  property.country,
-                  property.parking_spaces,
-                  property.number_of_bathrooms,
-                  property.number_of_bedrooms];
-  return pool.query(`INSERT INTO properties (owner_id, title,
-    description, thumbnail_photo_url, cover_photo_url, cost_per_night,
-    street, city, province, post_code, country, parking_spaces,
-    number_of_bathrooms, number_of_bedrooms) 
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-    RETURNING *;
-    `, values)
-      .then((response) => {
-        return response.rows[0];
-      });
-};
+
+  // starting params are empty
+  const queryParams = [];
+  for (const key in property) {
+    queryParams.push(property[key])
+  }
+
+  const queryString = `
+  INSERT INTO properties 
+    (title, description, number_of_bedrooms, number_of_bathrooms, parking_spaces, cost_per_night, thumbnail_photo_url, cover_photo_url,
+    street, country, city, province, post_code, owner_id)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+  RETURNING *;
+  `;
+
+  return pool.query(queryString, queryParams)
+  .then(res => {
+    return res.rows;
+  })
+
+}
 
 exports.addProperty = addProperty;
