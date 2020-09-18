@@ -8,11 +8,8 @@ const pool = new Pool ({
   database: 'lightbnb'
 });
 
-
 const properties = require('./json/properties.json');
 const users = require('./json/users.json');
-
-/// Users
 
 /**
  * Get a single user from the database given their email.
@@ -34,18 +31,6 @@ const getUserWithEmail = function(email) {
     })
 }
 
-// const getUserWithEmail = function(email) {
-//   let user;
-//   for (const userId in users) {
-//     user = users[userId];
-//     if (user.email.toLowerCase() === email.toLowerCase()) {
-//       break;
-//     } else {
-//       user = null;
-//     }
-//   }
-//   return Promise.resolve(user);
-// }
 exports.getUserWithEmail = getUserWithEmail;
 
 /**
@@ -82,12 +67,6 @@ const addUser = function(user) {
   })
 }
 
-// const addUser =  function(user) {
-//   const userId = Object.keys(users).length + 1;
-//   user.id = userId;
-//   users[userId] = user;
-//   return Promise.resolve(user);
-// }
 exports.addUser = addUser;
 
 /// Reservations
@@ -114,9 +93,6 @@ const getAllReservations = function(guest_id, limit = 10) {
   .then(res => res.rows);
 }
 
-// const getAllReservations = function(guest_id, limit = 10) {
-//   return getAllProperties(null, 2);
-// }
 exports.getAllReservations = getAllReservations;
 
 /// Properties
@@ -190,13 +166,6 @@ exports.getAllReservations = getAllReservations;
   .then(res => res.rows);
 }
 
-// const getAllProperties = function(options, limit = 10) {
-//   const limitedProperties = {};
-//   for (let i = 1; i <= limit; i++) {
-//     limitedProperties[i] = properties[i];
-//   }
-//   return Promise.resolve(limitedProperties);
-// }
 exports.getAllProperties = getAllProperties;
 
 
@@ -234,11 +203,4 @@ const addProperty = function(property) {
       });
 };
 
-// const addProperty = function(property) {
-//   console.log("HELLO WORLD", property)
-//   const propertyId = Object.keys(properties).length + 1;
-//   property.id = propertyId;
-//   properties[propertyId] = property;
-//   return Promise.resolve(property);
-// }
 exports.addProperty = addProperty;
